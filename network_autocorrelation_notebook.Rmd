@@ -1,0 +1,662 @@
+---
+title: "New tools for network time series with an application to COVID-19 hospitalisations"
+output:
+  html_document:
+    fig_width: 7
+    fig_height: 6
+    fig_caption: yes
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1 Introduction
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. This notebook replicates results in $\textbf{New tools for network time series with an application to COVID-19 hospitalisations}$; see https://arxiv.org/abs/2312.00530, and produces further Corbit and R-Corbit plots examples. 
+
+
+
+# 2 Sample Corbit plots and GNAR simulations
+
+Simulate realisations of differing length coming from the stationary global-$\alpha$ GNAR model below
+
+$$ 
+\begin{equation} \label{eq:vector wise representation}
+    \boldsymbol{X}_{t} = \sum_{k = 1}^{p} \left (\alpha_{k} \boldsymbol{X}_{t - k} + \sum_{r = 1}^{s_k} \beta_{kr} \boldsymbol{Z}_{r, t - k} \right ) + \boldsymbol{u}_{t} ,
+\end{equation}
+$$
+We use the $\texttt{fiveNet}$ (included in the CRAN $\texttt{GNAR}$ package) network throughout this notebook for producing all relevant figures.
+
+## 2.1 Producing GNAR simulations
+
+We begin by loading the GNAR package into our session in $\texttt{R}$.
+```{r packages}
+  library(GNAR)
+  source("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/R-Corbit_Covid.R")
+```
+We simulate a realisation of length one-hundred by using the function $\texttt{GNARsim}$. The code for producing the first simulation also shows how to compute the $r$-stage adjacency matrices and the weights matrix for the $\texttt{fiveNet}$ network.
+
+```{r}
+  n_sims = 100
+  # Compute the r-stage adjacency matrices
+  stages_tensor = get_k_stages_adjacency_tensor(
+  as.matrix(GNARtoigraph(fiveNet)), 
+  3)
+  # Compute the weights-matrix for the fiveNet network
+  W_normalised = weights_matrix(fiveNet, 3)
+
+  
+  # First Simulation GNAR(1, [1])
+  sim1 <-  GNARsim(n = n_sims, net=fiveNet,
+                 alphaParams = list(rep(0.47, 5)), 
+                 betaParams = list(c(0.46)))
+```
+We proceed to compute a Corbit plot for the simulation produced above. 
+
+```{r figs, fig.width=7,fig.height=6,fig.cap="Figure 1: Corbit plot for a realisation of length 100 coming from a stationary global-alpha GNAR(1, [1]) process.", echo=TRUE}
+  m_lag = 20
+  m_stage = 5
+  corbit_plot(vts = sim1, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'cividis')
+```
+The Corbit plot above uses the $\texttt{cividis}$ colour scale, however, users can specify any colour scale supported by the $\texttt{viridis}$ package (all of which are colour-blind friendly). Note that the Corbit plot can quickly aid analysts for detecting seasonality and trend in an observed realisation of a (network) time series. We incorporate a seasonal term as a cosine wave of period four into simulation one and produce the new Corbit plot. 
+
+```{r, fig.width=7,fig.height=6,fig.cap="Figure 2: Corbit plot for a realisation of length 100 coming from a seasonal global-alpha GNAR(1, [1]) process.", echo=TRUE}
+  m_lag = 20
+  m_stage = 5
+  sim1_seasonal = vapply(c(1:5), function(x) {sim1[, x] + 2 * (1 + cos(c(1:n_sims) * pi / 2)) }, rep(0, n_sims))
+  corbit_plot(vts = sim1_seasonal, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'cividis')
+```
+
+The Corbit plot in Figure 2 successfully reflects the seasonal period every four lags. We incorporate a linear trend into Simulation 1 below, and analyse the resulting Corbit plot below. 
+
+```{r, fig.width=7,fig.height=6,fig.cap="Figure 3: Corbit plot for a realisation of length 100 coming from a global-alpha GNAR(1, [1]) process plus a linear trend.", echo=TRUE}
+  m_lag = 20
+  m_stage = 5
+  sim1_trend = vapply(c(1:5), function(x) {sim1[, x] + c(1:n_sims) }, rep(0, n_sims))
+  corbit_plot(vts = sim1_trend, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'cividis')
+```
+
+Finally, we incorporate both a trend and seasonal component into Simulation 1, and analyse the resulting Corbit plot.
+
+```{r, fig.width=7, fig.height=6, fig.cap="Figure 3: Corbit plot for a realisation of length 100 coming from a global-alpha GNAR(1, [1]) process plus a linear trend.", echo=TRUE}
+  m_lag = 20
+  m_stage = 5
+  sim1_trend_seasonal = vapply(c(1:5), function(x) {sim1[, x] + 2 * (1 + cos(c(1:n_sims) * pi / 2)) + c(1:n_sims) / 10 }, rep(0, n_sims))
+  corbit_plot(vts = sim1_trend_seasonal, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'cividis')
+```
+
+
+## 2.2 Recovering model order 
+
+We simulate a realisation of length one-thousand coming from a stationary global-$\alpha$ GNAR$(3, [2, 1, 0])$ process. Subsequently, we compute the mean value of the NACF and PNACF at each iteration. 
+
+```{r}
+  # Simulate a realisation of length 100 coming from a stationary GNAR(2, [1, 2]) 
+  nsims_2 = 1000
+  sim2 <- GNARsim(n = nsims_2, net=fiveNet,
+                alphaParams = list(rep(0.12, 5), rep(0.18, 5)), 
+                betaParams = list(c(0.21), c(-0.32, 0.12)))
+  # Compute the corresponding Corbit plot for the PNACF
+  corbit_plot(vts = sim2, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'turbo', partial = "yes")
+```
+
+We examine another model.
+
+```{r}
+  # Simulate a realisation of length 100 coming from a stationary GNAR(2, [1, 2]) 
+  nsims = 100
+  sim2 <- GNARsim(n = nsims, net=fiveNet,
+                alphaParams = list(rep(0.21, 5), rep(0.18, 5)), 
+                betaParams = list(c(0.12), c(0.32, 0.12)))
+  # Compute the corresponding Corbit plot for the PNACF
+  corbit_plot(vts = sim2, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'viridis', partial = "yes")
+```
+
+We examine a basic GNAR model
+
+```{r}
+  # Simulate a realisation of length 100 coming from a stationary GNAR(2, [1, 2]) 
+  nsims = 100
+  sim2 <- GNARsim(n = nsims, net=fiveNet,
+                alphaParams = list(rep(0.35, 5), rep(0.12, 5)), 
+                betaParams = list(c(0.24), c(0.17)))
+  # Compute the corresponding Corbit plot for the PNACF
+  corbit_plot(vts = sim2, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'viridis', partial = "yes")
+```
+
+## 2.3 Producing R-Corbit plots
+
+R-Corbit plots allow quick comparison of network correlation structures for different time-slices and/or covariates (e.g., labels). We produce an example comparing three distinct GNAR simulations below.
+
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+# Initialise values
+m_lag = 20
+m_stage = 3
+n_sims = 200
+set.seed(2023)
+
+# Produce GNAR simulations
+sim1 <-  GNARsim(n = n_sims, net=fiveNet, alphaParams = list(c(0.1, 0.12, 0.16, 0.075, 0.21),
+                                                                  c(0.12, 0.14, 0.15, 0.3, 0.22)), 
+                        betaParams = list(c(0.16, 0.10), c(0.14, 0.11)))
+
+sim2 <-  GNARsim(n = n_sims, net=fiveNet, alphaParams = list(rep(0.23, 5), rep(0.11, 5)), 
+                 betaParams = list(c(0.21), c(0.12)))
+
+sim3 <-  GNARsim(n = n_sims, net=fiveNet, alphaParams = list(rep(0.12, 5), rep(0.10, 5)), 
+                 betaParams = list(c(0.25, 0.27), c(0.18)))
+
+# Produce R-Corbot plots
+R_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes")
+
+R_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes", partial = "yes")
+```
+
+
+
+# 3 Analysing the COVID-19 NHS network time-series
+
+We start by loading the NHS trust network time series (included in the $\texttt{GNAR}$ package). The network time series is a realisation of length four-hundred-and-fifty-two (452) that corresponds to the logarithm of the daily number of patients occupying mechanical ventilation beds, i.e., $\log (1 + Y_{i, t})$, where $Y_{i, t}$ is the number of patients occupying mechanical ventilation beds in NHS trust $i = 1, \dots, 140$ on day $t = 1, \dots, 452$.
+
+```{r}
+# Preliminary objects
+# load the NHS trust network time series
+covid_data = logMVbedMVC.vts
+
+# Compute the weight matrix for the NHS trusts network
+W_nhs_trust = weights_matrix(NHSTrustMVCAug120.net, 1)
+```
+
+We visualise the evolution of the series by plotting the sum of the total number of patients transferred to mechanical ventilation beds on each day. Further, we compute the mean and standard deviaiton up to day $t$ for exploratory data analysis.
+
+```{r}
+  sum_series = as.ts(rowSums(logMVbedMVC.vts))
+plot(c(1:452), sum_series, 'l', xlab = 't', main = expression(paste('Plot of the Sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+     ylab = expression(Y[t]), col = 'blue')
+
+plot(c(1:452), sum_series / 140, 'l', xlab = 't', main = expression(paste('Plot of daily mean occupancy of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140) / 140)), 
+     ylab = expression(Y[t]), col = 'blue')
+
+
+# compute mean and standard deviation up top day t
+sum_series_mean = vapply(c(1:length(sum_series)), function(x) {mean(sum_series[1:x])}, 0)
+sum_series_sd = vapply(c(1:length(sum_series)), function(x) {sd(sum_series[1:x])}, 0)
+
+# plot mean and standard deviation
+plot(c(1:452), sum_series_mean, 'l', xlab = 't', main = expression(paste('Plot of the mean sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+     ylab = expression(mean(Y[t])), col = 'blue')
+
+plot(c(1:452), sum_series_sd, 'l', xlab = 't', main = expression(paste('Plot of the sum sd of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+     ylab = expression(sd(Y[t])), col = 'blue')
+
+```
+
+
+## 3.1 Model order selection
+
+We analyse the network autocorrelation structure by analysing the Corbit plots below. First, we produce the NACF Corbit plot. 
+
+```{r}
+  corbit_plot(covid_data, NHSTrustMVCAug120.net, 20, 6)
+```
+
+Subsequently, we analyse the PNACF Corbit plot, which aids model selection and visualising dependence in the data.
+
+```{r}
+  corbit_plot(covid_data, NHSTrustMVCAug120.net, 10, 6, partial="yes")
+```
+
+The Corbit plots above suggest that network autocorrelation cuts-off after the first lag, further, that one-stage neighbours appear to have a stronger correlation than higher-order $r$-stage neighbours. These Corbit plots suggest comparing the following models. 
+
+
+```{r}
+  # Create a table for storing model diagnostic statistics
+  GNAR_model_comparison_table <- array(dim = c(6, 5))
+  colnames(GNAR_model_comparison_table) <- c("No. of param. ", "  One-Step SE  ", "  Two-Step SE  ", "AIC", "BIC")
+  
+```
+
+We compare GNAR fits for the time-steps selected below.
+
+```{r}
+  covid_data_set = covid_data[1:447, ]
+  test_set = covid_data[448:452, ]
+```
+
+The code for fitting a GNAR$(1, [1])$ is
+
+```{r}
+  # GNAR(1, [1])
+  # model order specification
+  plag = 1
+  stages = c(1)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[1, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[1, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[1, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[1, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[1, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+ 
+The code for fitting a GNAR$(1, [6])$ is
+
+```{r}
+  # GNAR(1, [6])
+  # model order specification
+  plag = 1
+  stages = c(6)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[2, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[2, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[2, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[2, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[2, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+
+The code for fitting a GNAR$(2, [6, 6])$ is
+
+```{r}
+  # GNAR(2, [6, 6])
+  # model order specification
+  plag = 2
+  stages = c(6, 6)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[3, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[3, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[3, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[3, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[3, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+
+
+The code for fitting a GNAR$(6, [6^6])$ is
+
+```{r}
+  # GNAR(6, [6, ..., 6])
+  # model order specification
+  plag = 6
+  stages = rep(6, 6)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[4, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[4, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[4, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[4, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[4, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+
+The code for fitting a GNAR$(1, [0])$ is
+
+```{r}
+  # GNAR(1, [0])
+  # model order specification
+  plag = 1
+  stages = c(0)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[5, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[5, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[5, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[5, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[5, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+
+The code for fitting a GNAR$(10, [0])$ is
+
+```{r}
+  # GNAR(10, [0])
+  # model order specification
+  plag = 10
+  stages = rep(0, 10)
+  
+  # fitting the model
+  covid_fit <- GNARfit(covid_data_set, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  
+  # Number of parameters
+  GNAR_model_comparison_table[6, 1] = length(covid_fit$mod$coefficients)
+  GNAR_model_comparison_table[6, 4] = AIC(covid_fit)
+  GNAR_model_comparison_table[6, 5] = BIC(covid_fit)
+  
+  # one-step ahead forecast
+  one_step = predict(covid_fit)
+  GNAR_model_comparison_table[6, 2] = sum((one_step - test_set[1, ])^2)
+  
+  # two-step ahead forecast
+  new_data = rbind(covid_data_set, one_step)
+  new_fit = GNARfit(new_data, net = NHSTrustMVCAug120.net, alphaOrder = plag, betaOrder = stages)
+  GNAR_model_comparison_table[6, 3] = sum((predict(new_fit)- test_set[2, ])^2)
+```
+ 
+We compare the models by printing the following table.
+ 
+```{r}
+  GNAR_model_comparison_table = round(GNAR_model_comparison_table, 3)
+  
+  rownames(GNAR_model_comparison_table) <- c("GNAR(1, [1])", "GNAR(1, [6])", "GNAR(2, [6, 6])", "GNAR(6, [6,:6])", "GNAR(1, [0])", "GNAR(10, [0])")
+  
+  knitr::kable(GNAR_model_comparison_table, "simple")
+```
+ 
+
+
+
+## 3.2 Comparison with VAR models
+We compare a GNAR$(1, [1])$ with VAR and sparse VAR models. We begin by loading the required libraries.
+
+```{r}
+  library(forecast)
+  library(vars)
+  library(sparsevar)
+```
+We perform one-step ahead prediction ten times. The starting time-step and error vectors are initialised below.
+
+```{r}
+  # number of one-step ahead predictions
+  # dummt counter variable
+  k = 0
+  t_steps = 10
+  
+  # starting point
+  covid_data = logMVbedMVC.vts
+  initial_start = nrow(covid_data) - t_steps
+  decimal_digits = 3
+  
+  # AR model prediction error
+  ar_pe = rep(0, t_steps)
+  
+  # global-alpha GNAR model prediction error
+  gnar_pe = rep(0, t_steps)
+  # local-alpha GNAR model prediction error
+  gnar_no_global_pe = rep(0, t_steps)
+  
+  # VAR prediction error
+  var_pe = rep(0, t_steps)
+  
+  # restricted VAR prediction error
+  res_var_pe = rep(0, t_steps)
+  
+  # sparse VAR prediction error
+  sparse_var_pe = rep(0, t_steps)
+  
+```
+We perform one-ahead forecasting ten times and save the squared error.
+
+```{r}
+  for (i in 1:t_steps) {
+  # initialise the comparison table
+  output <- matrix(rep(0, 18), nrow = 6, ncol = 3)
+  train_end = initial_start + k
+  test_point = train_end + 1
+  
+# We compare the GNAR models in this script
+# 140 AR(1) models
+  arforecast <- apply(covid_data[1:train_end, ], 2, function(x){
+    forecast(auto.arima(x, d = 0, D = 0, max.p = 1, max.q = 0,
+             max.P = 0, max.Q = 0, stationary = TRUE, seasonal = FALSE, ic = 'bic',
+             allowmean = FALSE, allowdrift = FALSE, trace = FALSE), h = 1)$mean 
+  })
+  output[5, 2] = "$140$"
+  output[5, 1] = "AR(1)"
+  output[5, 3] = round(sum((arforecast - covid_data[test_point, ])^2), digits = decimal_digits)
+  ar_pe[i] = output[5, 3]
+
+# GNAR(1, [1]) global-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1))
+  output[1, 2] = 2
+  output[1, 3] = round(sum((predict(covid_fit) - covid_data[test_point, ])^2), digits = decimal_digits)
+  gnar_pe[i] = output[1, 3]
+  output[1, 1] = "GNAR(1, [1])"
+
+# GNAR(1, [1]) local-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1), globalalpha=FALSE)
+  output[6, 2] = 141
+  output[6, 3] = round(sum((predict(covid_fit) - covid_data[test_point, ])^2), digits = decimal_digits)
+  gnar_no_global_pe[i] = output[6, 3]
+  output[6, 1] = "GNAR(1, [1])*"
+
+
+# Restricted VAR(1) model
+  varforecast <- predict(restrict(VAR(covid_data[1:train_end, ], p = 1, type = 'none')), n.ahead = 1)
+  get_var_fcst <- function(x){return (x[1])}
+  var_point_fcst <- unlist(lapply(varforecast$fcst, get_var_fcst))
+  output[3, 3] = round(sum((var_point_fcst - covid_data[test_point, ])^2), digits = decimal_digits)
+  res_var_pe[i] = output[3, 3]
+  active = 0.0
+  aux = varforecast$model$varresult
+  for (ii in 1:ncol(covid_data)) {
+    for (j in 1:length(aux[[ii]][[1]])){
+      if (abs(aux[[ii]][[1]][j]) > 0.0) {
+        active = active + 1
+      }
+    }
+  }
+  output[3, 1] = "Res. VAR(1)"
+  output[3, 2] = active
+
+
+# Classic VAR(1) model
+  varforecast <- predict(VAR(covid_data[1:train_end, ], p = 1, type = 'none'), n.ahead = 1)
+  get_var_fcst <- function(x){return (x[1])}
+  var_point_fcst <- unlist(lapply(varforecast$fcst, get_var_fcst))
+  output[2, 2] = "$140^2$"
+  output[2, 3] = round(sum((var_point_fcst - covid_data[test_point, ])^2), digits = decimal_digits)
+  var_pe[i] = output[2, 3]
+  output[2, 1] = "VAR(1)"
+
+# Sparse VAR(1) model
+  sparse_var_forecast <- fitVAR(covid_data[1:train_end, ], p = 1)
+  xhat = sparse_var_forecast$A[[1]] %*% covid_data[train_end, ]
+  output[4, 3] = round(sum((xhat - covid_data[test_point, ])^2), digits = decimal_digits)
+  sparse_var_pe[i] = output[4, 3]
+  b = sparse_var_forecast$A[[1]]
+  b[abs(b) > 0.0] = 1
+  output[4, 2] = sum(rowSums(b))
+  output[4, 1] = "Sparse VAR(1)"
+##########################
+  # stack all ten tables
+  colnames(output) <- c("Model", "Active Parameters", "One-Step SPE")
+  print(output)
+  cat("\n############################################# \n#############################################\n")
+  if (i == 1) {
+    out_data = output
+  } else {
+    out_data = rbind(out_data, output)
+  }
+  k = k + 1
+  }
+  
+  comp_results = cbind(as.numeric(gnar_pe), as.numeric(sparse_var_pe), as.numeric(res_var_pe), as.numeric(var_pe), as.numeric(ar_pe), as.numeric(gnar_no_global_pe))
+  print(colMeans(comp_results))
+
+  aux = out_data[out_data[, 1] == 'Sparse VAR(1)']
+  print(mean(as.numeric(aux[11:20])))
+  # 3089
+  aux = out_data[out_data[, 1] == 'Res. VAR(1)']
+  print(mean(as.numeric(aux[11:20])))
+  # 3773
+  all_summary = matrix(rep(0, 18), nrow = 6, ncol = 3)
+  all_summary[, 1] = colMeans(comp_results)
+  all_summary[, 2] = c(2, 2962, 3767, 19600, 140, 141)
+  for (j in 1:ncol(comp_results)) {
+    all_summary[j, 3] = sd(comp_results[, j])
+  }
+  knitr::kable(all_summary, "simple")
+```
+
+
+
+## 3.3 Comparison with CAR model
+
+For completeness we also compare GNAR with a conditional autoregressive temporal autoregressive (CARar) model. Mean squared prediction error (MSPE) comparisons, including standard deviation (sd. MSPE) follow in the Table below. Interestingly, both models perform similarly. It turns out that CARar models can be seen as GNAR models constrained to one-stage neighbourhood regressions. Computation for CARar requires expensive MCMC calls, thus, for brevity we summarise the results below; see https://github.com/dansal182/new_tools_for_network_time_series_with_application_to_COVID_19_hospitalisations for the experiments code.
+
+```{r, echo = FALSE}
+  gnar = c(7.4, 2.98, 2)
+  sparse_var = c(11.4, 2.80, 3089)
+  res_var = c(10.6, 2.48, 3773)
+  var = c(12.3, 3.18, 19600)
+  ar = c(87.4, 5.15, 140)
+  CARar = c(7.5, 3.10, 5)
+  GNAR_centre =c(7.2, 2.82, 2)
+  naive = c(7.6, 3.12,  0)
+
+  col_names = c("GNAR(1, [1])", "sp. VAR", "res. VAR", "var", "CARar", "GNAR_centre", "naive")
+
+  mspe_table = data.frame(" " = c("MSPE", "sd. MSPE", "No. Parameters"), "GNAR(1, [1])" = gnar, "sp. VAR" = sparse_var, "res. VAR" = res_var, "VAR" = var,
+                        "CARar" = CARar, "GNARc" = GNAR_centre, "Naive" = naive, check.names = FALSE)
+
+  knitr::kable(mspe_table, "simple")
+```
+
+
+Above, GNARc denotes GNAR model with centred columns, i.e., we subtract the column mean before fitting the model. We also remark the difference in execution time (in seconds): 
+
+```{r, echo = FALSE}
+  computation_time_table = data.frame(" " = c("GNAR(1, [1])", "CARar(1)"), "Total time" = c(6.2, 7821.9), "Average time" =
+                                      c(0.62, 782.19), check.names = FALSE)
+
+knitr::kable(computation_time_table, "simple")
+
+```
+
+
+Execution time comparison between global-$\alpha$ GNAR models and CARar models. The total execution time is the time computing one-step ahead forecasts ten times (i.e., the forecasts used for producing MSPE Table) takes in seconds. The average time is the total time divided by ten.
+
+
+## 3.4 Analysing node impact on network autocorrelation
+
+We analyse the impact individual nodes have on network autocorrelation for our choice of model order. Further, we study the  relative importance each node has in pair-wise node regressions, and compare the one-lag cross-correlation matrix with a heat map obtained from Theorem 2, this comparison shows the self-similar clustering behaviour for pair-wise correlations. 
+
+We start by defining the different waves of the pandemic and looking at a R-Corbit plot of the realised network autocorrelation.
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+  covid_data = logMVbedMVC.vts
+  W_nhs_network = weights_matrix(NHSTrustMVCAug120.net, 6)
+
+
+  first_wave = covid_data[1:100, ]
+  gap = covid_data[101:177, ]
+  second_wave = covid_data[178:447, ]
+  time_slices = c('First Wave: 04-2020 -> 07-2020', 'Gap: 07-2020 -> 09-2020', 'Second Wave: 09-2020 -> 07-2021')
+  R_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
+            frame_names = time_slices)
+```
+
+The PNACF R-Corbit plot is produced with the code below.
+
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+  R_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
+            frame_names = time_slices, partial = 'yes')
+```
+
+
+We explore the importance individual nodes have for predicting each other with the heat-map below. Note that it is not symmetric, the yellow colour highlights the strongest pair-wise realations according to formula (18) in $\textbf{New tools for network time series with an application to COVID-19 hospitalisations}$.
+
+```{r, fig.width=12,fig.height=10, echo=TRUE}
+ active_node_plot(second_wave, NHSTrustMVCAug120.net, 1, c(1))
+```
+
+We continue by looking at the impact each node has on the total network autocorrelation (i.e., the column in $\mathbf{W}$ that dominates autocorrelation). We do this by producing the node relevance hierarchy and plot, which is computed using (17).
+
+```{r, fig.width=12,fig.height=10, echo=TRUE}
+  node_relevance_plot(NHSTrustMVCAug120.net, 1, colnames(covid_data), 1)
+```
+
+We compare the observed one-lag cross-correlation and the structure Theorem 2 suggests in the plots below. Note that the neighbourhood and self-similarity suggests that outbreaks are mostly dependent on direct neighbours, i.e., the virus cannot reach nodes by jumps it must traverse all NHS trusts (i.e., nodes) in a path between two places for instigating an outbreak. 
+
+```{r, fig.width=12,fig.height=10, echo=TRUE}
+# larger r-stage changes the correlation structure
+  max_r_stage = 1
+  local_relevance_plot(NHSTrustMVCAug120.net, max_r_stage)
+```
+
+
+
+```{r, fig.width=12,fig.height=10, echo=TRUE}
+  cross_correlation_plot(1, covid_data)
+```
+
+All three plots, except for the node relevance one, have the following column and row names.
+
+```{r}
+  dummy_vec = vapply(c(1:140), function(x) {cat(paste0(x, ": ", colnames(covid_data)[x]), "\n"); return (0)}, 0)
+```
+
+We plot the network and colour the nodes according to node relevance given by (18).
+
+```{r, fig.width=12,fig.height=10, echo=TRUE}
+  library(igraph)
+library(GNAR)
+  load("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/node_relevance_plot_data.RData")
+  
+  nhs_adjacency = as.matrix(GNARtoigraph(NHSTrustMVCAug120.net))
+  colnames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  rownames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  
+  nhs_net_igraph = graph_from_adjacency_matrix(nhs_adjacency, "undirected")
+  plot(nhs_net_igraph)
+
+  V(nhs_net_igraph)$relevance <- node_data_aux[, 2]
+
+  V(nhs_net_igraph)$color <- node_data_aux[, 3]
+
+  V(nhs_net_igraph)$label.color <- rep("white", 140)
+  plot(nhs_net_igraph)
+
+```
+
+```{r, fig.width=12,fig.height=2.5, echo = FALSE}
+   barplot(rep(1, 140), col = node_hierarchy_NHS_network[, 3], names.arg = round(seq(0, 1, 1/139), 2), axes = FALSE, main = "Node relevance for NHS Trusts network")
+```
