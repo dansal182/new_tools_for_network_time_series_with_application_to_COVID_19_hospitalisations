@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # 1 Introduction
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. This notebook replicates results in $\textbf{New tools for network time series with an application to COVID-19 hospitalisations}$; see https://arxiv.org/abs/2312.00530, and produces further Corbit and R-Corbit plots examples. 
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. This notebook replicates results in $\textbf{New tools for network time series with an application to COVID-19 hospitalisations}$, and produces further Corbit and R-Corbit plots examples; see https://arxiv.org/abs/2312.00530.
 
 
 
@@ -21,7 +21,7 @@ This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute
 
 Simulate realisations of differing length coming from the stationary global-$\alpha$ GNAR model below
 
-$$ 
+$$
 \begin{equation} \label{eq:vector wise representation}
     \boldsymbol{X}_{t} = \sum_{k = 1}^{p} \left (\alpha_{k} \boldsymbol{X}_{t - k} + \sum_{r = 1}^{s_k} \beta_{kr} \boldsymbol{Z}_{r, t - k} \right ) + \boldsymbol{u}_{t} ,
 \end{equation}
@@ -31,7 +31,7 @@ We use the $\texttt{fiveNet}$ (included in the CRAN $\texttt{GNAR}$ package) net
 ## 2.1 Producing GNAR simulations
 
 We begin by loading the GNAR package into our session in $\texttt{R}$.
-```{r packages}
+```{r packages, echo=FALSE}
   library(GNAR)
   source("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/R-Corbit_Covid.R")
 ```
@@ -170,24 +170,28 @@ W_nhs_trust = weights_matrix(NHSTrustMVCAug120.net, 1)
 
 We visualise the evolution of the series by plotting the sum of the total number of patients transferred to mechanical ventilation beds on each day. Further, we compute the mean and standard deviaiton up to day $t$ for exploratory data analysis.
 
-```{r}
+```{r, fig.width=14,fig.height=10}
   sum_series = as.ts(rowSums(logMVbedMVC.vts))
-plot(c(1:452), sum_series, 'l', xlab = 't', main = expression(paste('Plot of the Sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+plot(c(1:452), sum_series, 'l', xlab = 't', main = expression(paste('Plot of rolling sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
      ylab = expression(Y[t]), col = 'blue')
 
-plot(c(1:452), sum_series / 140, 'l', xlab = 't', main = expression(paste('Plot of daily mean occupancy of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140) / 140)), 
+plot(c(1:452), sum_series / 140, 'l', xlab = 't', main = expression(paste('Plot of rolling incremental mean occupancy of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140) / 140)), 
      ylab = expression(Y[t]), col = 'blue')
 
 
 # compute mean and standard deviation up top day t
 sum_series_mean = vapply(c(1:length(sum_series)), function(x) {mean(sum_series[1:x])}, 0)
 sum_series_sd = vapply(c(1:length(sum_series)), function(x) {sd(sum_series[1:x])}, 0)
+sd_time_series_values = vapply(c(1:452), function(x) {sd(logMVbedMVC.vts[x, ])}, 0.0)
+# plot of rolling standard deviation of all NHS trusts at each time point, i.e., sd(X_{i, t})
 
-# plot mean and standard deviation
-plot(c(1:452), sum_series_mean, 'l', xlab = 't', main = expression(paste('Plot of the mean sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+plot(c(1:452), sum_series_mean, 'l', xlab = 't', main = expression(paste('Plot of rolling incremental mean sum of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
      ylab = expression(mean(Y[t])), col = 'blue')
 
-plot(c(1:452), sum_series_sd, 'l', xlab = 't', main = expression(paste('Plot of the sum sd of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
+plot(c(1:452), sd_time_series_values, 'l', xlab = 't', main = expression(paste('Plot of rolling standard deviation of joint time-series: ', Y[t] == sd(X["i, t"]), ", where i = 1 to 140")), 
+     ylab = expression(Y[t]), col = 'blue')
+
+plot(c(1:452), sum_series_sd, 'l', xlab = 't', main = expression(paste('Plot of rolling incremental standard deviation of the sum consisting of all NHS time-series: ', Y[t] == sum(X["i, t"], i == 1, 140))), 
      ylab = expression(sd(Y[t])), col = 'blue')
 
 ```
@@ -213,7 +217,7 @@ The Corbit plots above suggest that network autocorrelation cuts-off after the f
 ```{r}
   # Create a table for storing model diagnostic statistics
   GNAR_model_comparison_table <- array(dim = c(6, 5))
-  colnames(GNAR_model_comparison_table) <- c("No. of param. ", "  One-Step SE  ", "  Two-Step SE  ", "AIC", "BIC")
+  colnames(GNAR_model_comparison_table) <- c("#(parameters)", "  One-Step SE  ", "  Two-Step SE  ", "AIC", "BIC")
   
 ```
 
@@ -383,7 +387,7 @@ The code for fitting a GNAR$(10, [0])$ is
  
 We compare the models by printing the following table.
  
-```{r}
+```{r, echo=FALSE}
   GNAR_model_comparison_table = round(GNAR_model_comparison_table, 3)
   
   rownames(GNAR_model_comparison_table) <- c("GNAR(1, [1])", "GNAR(1, [6])", "GNAR(2, [6, 6])", "GNAR(6, [6,:6])", "GNAR(1, [0])", "GNAR(10, [0])")
@@ -534,10 +538,148 @@ We perform one-ahead forecasting ten times and save the squared error.
   for (j in 1:ncol(comp_results)) {
     all_summary[j, 3] = sd(comp_results[, j])
   }
+  all_summary = data.frame(" " = c("GNAR(1, [1])", "VAR(1)", "Res. VAR(1)", "Sp. VAR(1)", "AR(1)", "GNAR(1, [1])*"), "MSPE" = all_summary[, 1], "sd(MSPE)" = all_summary[, 3], "#(parameters)" = all_summary[, 2], check.names = FALSE)
   knitr::kable(all_summary, "simple")
 ```
 
 
+### 3.3.1 Comparison with VAR at highest growing peak (i.e., second-wave peak)
+
+For completeness, we also compare the models at the peak of the second wave.
+
+```{r}
+  # number of one-step ahead predictions
+  # dummt counter variable
+  k = 0
+  t_steps = 10
+  
+  # starting point
+  covid_data = logMVbedMVC.vts
+  initial_start = 300 - t_steps
+  decimal_digits = 3
+  
+  # AR model prediction error
+  ar_pe = rep(0, t_steps)
+  
+  # global-alpha GNAR model prediction error
+  gnar_pe = rep(0, t_steps)
+  # local-alpha GNAR model prediction error
+  gnar_no_global_pe = rep(0, t_steps)
+  
+  # VAR prediction error
+  var_pe = rep(0, t_steps)
+  
+  # restricted VAR prediction error
+  res_var_pe = rep(0, t_steps)
+  
+  # sparse VAR prediction error
+  sparse_var_pe = rep(0, t_steps)
+  
+```
+We perform one-ahead forecasting ten times and save the squared error.
+
+```{r, echo=FALSE}
+  for (i in 1:t_steps) {
+  # initialise the comparison table
+  output <- matrix(rep(0, 18), nrow = 6, ncol = 3)
+  train_end = initial_start + k
+  test_point = train_end + 1
+  
+# We compare the GNAR models in this script
+# 140 AR(1) models
+  arforecast <- apply(covid_data[1:train_end, ], 2, function(x){
+    forecast(auto.arima(x, d = 0, D = 0, max.p = 1, max.q = 0,
+             max.P = 0, max.Q = 0, stationary = TRUE, seasonal = FALSE, ic = 'bic',
+             allowmean = FALSE, allowdrift = FALSE, trace = FALSE), h = 1)$mean 
+  })
+  output[5, 2] = "$140$"
+  output[5, 1] = "AR(1)"
+  output[5, 3] = round(sum((arforecast - covid_data[test_point, ])^2), digits = decimal_digits)
+  ar_pe[i] = output[5, 3]
+
+# GNAR(1, [1]) global-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1))
+  output[1, 2] = 2
+  output[1, 3] = round(sum((predict(covid_fit) - covid_data[test_point, ])^2), digits = decimal_digits)
+  gnar_pe[i] = output[1, 3]
+  output[1, 1] = "GNAR(1, [1])"
+
+# GNAR(1, [1]) local-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1), globalalpha=FALSE)
+  output[6, 2] = 141
+  output[6, 3] = round(sum((predict(covid_fit) - covid_data[test_point, ])^2), digits = decimal_digits)
+  gnar_no_global_pe[i] = output[6, 3]
+  output[6, 1] = "GNAR(1, [1])*"
+
+
+# Restricted VAR(1) model
+  varforecast <- predict(restrict(VAR(covid_data[1:train_end, ], p = 1, type = 'none')), n.ahead = 1)
+  get_var_fcst <- function(x){return (x[1])}
+  var_point_fcst <- unlist(lapply(varforecast$fcst, get_var_fcst))
+  output[3, 3] = round(sum((var_point_fcst - covid_data[test_point, ])^2), digits = decimal_digits)
+  res_var_pe[i] = output[3, 3]
+  active = 0.0
+  aux = varforecast$model$varresult
+  for (ii in 1:ncol(covid_data)) {
+    for (j in 1:length(aux[[ii]][[1]])){
+      if (abs(aux[[ii]][[1]][j]) > 0.0) {
+        active = active + 1
+      }
+    }
+  }
+  output[3, 1] = "Res. VAR(1)"
+  output[3, 2] = active
+
+
+# Classic VAR(1) model
+  varforecast <- predict(VAR(covid_data[1:train_end, ], p = 1, type = 'none'), n.ahead = 1)
+  get_var_fcst <- function(x){return (x[1])}
+  var_point_fcst <- unlist(lapply(varforecast$fcst, get_var_fcst))
+  output[2, 2] = "$140^2$"
+  output[2, 3] = round(sum((var_point_fcst - covid_data[test_point, ])^2), digits = decimal_digits)
+  var_pe[i] = output[2, 3]
+  output[2, 1] = "VAR(1)"
+
+# Sparse VAR(1) model
+  sparse_var_forecast <- fitVAR(covid_data[1:train_end, ], p = 1)
+  xhat = sparse_var_forecast$A[[1]] %*% covid_data[train_end, ]
+  output[4, 3] = round(sum((xhat - covid_data[test_point, ])^2), digits = decimal_digits)
+  sparse_var_pe[i] = output[4, 3]
+  b = sparse_var_forecast$A[[1]]
+  b[abs(b) > 0.0] = 1
+  output[4, 2] = sum(rowSums(b))
+  output[4, 1] = "Sparse VAR(1)"
+##########################
+  # stack all ten tables
+  colnames(output) <- c("Model", "Active Parameters", "One-Step SPE")
+  print(output)
+  cat("\n############################################# \n#############################################\n")
+  if (i == 1) {
+    out_data = output
+  } else {
+    out_data = rbind(out_data, output)
+  }
+  k = k + 1
+  }
+  
+  comp_results = cbind(as.numeric(gnar_pe), as.numeric(sparse_var_pe), as.numeric(res_var_pe), as.numeric(var_pe), as.numeric(ar_pe), as.numeric(gnar_no_global_pe))
+  print(colMeans(comp_results))
+
+  aux = out_data[out_data[, 1] == 'Sparse VAR(1)']
+  print(mean(as.numeric(aux[11:20])))
+  # 3089
+  aux = out_data[out_data[, 1] == 'Res. VAR(1)']
+  print(mean(as.numeric(aux[11:20])))
+  # 3773
+  all_summary = matrix(rep(0, 18), nrow = 6, ncol = 3)
+  all_summary[, 1] = colMeans(comp_results)
+  all_summary[, 2] = c(2, 2962, 3767, 19600, 140, 141)
+  for (j in 1:ncol(comp_results)) {
+    all_summary[j, 3] = sd(comp_results[, j])
+  }
+  all_summary = data.frame(" " = c("GNAR(1, [1])", "VAR(1)", "Res. VAR(1)", "Sp. VAR(1)", "AR(1)", "GNAR(1, [1])*"), "MSPE" = all_summary[, 1], "sd(MSPE)" = all_summary[, 3], "#(parameters)" = all_summary[, 2], check.names = FALSE)
+  knitr::kable(all_summary, "simple")
+```
 
 ## 3.3 Comparison with CAR model
 
@@ -555,7 +697,7 @@ For completeness we also compare GNAR with a conditional autoregressive temporal
 
   col_names = c("GNAR(1, [1])", "sp. VAR", "res. VAR", "var", "CARar", "GNAR_centre", "naive")
 
-  mspe_table = data.frame(" " = c("MSPE", "sd. MSPE", "No. Parameters"), "GNAR(1, [1])" = gnar, "sp. VAR" = sparse_var, "res. VAR" = res_var, "VAR" = var,
+  mspe_table = data.frame(" " = c("MSPE", "sd. MSPE", "#(parameters)"), "GNAR(1, [1])" = gnar, "sp. VAR" = sparse_var, "res. VAR" = res_var, "VAR" = var,
                         "CARar" = CARar, "GNARc" = GNAR_centre, "Naive" = naive, check.names = FALSE)
 
   knitr::kable(mspe_table, "simple")
@@ -636,7 +778,7 @@ All three plots, except for the node relevance one, have the following column an
 
 We plot the network and colour the nodes according to node relevance given by (18).
 
-```{r, fig.width=12,fig.height=10, echo=TRUE}
+```{r, fig.width=12,fig.height=10, echo=FALSE}
   library(igraph)
 library(GNAR)
   load("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/node_relevance_plot_data.RData")
@@ -659,4 +801,56 @@ library(GNAR)
 
 ```{r, fig.width=12,fig.height=2.5, echo = FALSE}
    barplot(rep(1, 140), col = node_hierarchy_NHS_network[, 3], names.arg = round(seq(0, 1, 1/139), 2), axes = FALSE, main = "Node relevance for NHS Trusts network")
+```
+
+For comparison purposes, and highlighting that node relevance depends on the network time series dynamics. We also plot the node relevance for $r^* = 3$ (i.e., largest shortets path equal to three), and $r^* = 6$ (i.e., largest shortets path equal to six). 
+
+### 3.4.1 Node relevance for r-stage depth equal to three
+
+```{r, fig.width=12,fig.height=10, echo=FALSE}
+  load("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/node_relevance_plot_data_rstar_three.RData")
+  
+  nhs_adjacency = as.matrix(GNARtoigraph(NHSTrustMVCAug120.net))
+  colnames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  rownames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  
+  nhs_net_igraph = graph_from_adjacency_matrix(nhs_adjacency, "undirected")
+
+  V(nhs_net_igraph)$relevance <- node_data_aux_rstar_three[, 2]
+
+  V(nhs_net_igraph)$color <- node_data_aux_rstar_three[, 3]
+
+  V(nhs_net_igraph)$label.color <- rep("white", 140)
+  plot(nhs_net_igraph)
+
+```
+
+```{r, fig.width=12,fig.height=2.5, echo = FALSE}
+   barplot(rep(1, 140), col = node_hierarchy_NHS_network_rstar_three[, 3], names.arg = round(seq(0, 1, 1/139), 2), axes = FALSE, main = "Node relevance for NHS Trusts network for r* = 3")
+```
+
+
+### 3.4.2 Node relevance for r-stage depth equal to six
+
+```{r, fig.width=12,fig.height=10, echo=FALSE}
+  load("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/node_relevance_plot_data_rstar_six.RData")
+  
+  nhs_adjacency = as.matrix(GNARtoigraph(NHSTrustMVCAug120.net))
+  colnames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  rownames(nhs_adjacency) = colnames(logMVbedMVC.vts)
+  
+  nhs_net_igraph = graph_from_adjacency_matrix(nhs_adjacency, "undirected")
+
+  V(nhs_net_igraph)$relevance <- node_data_aux_rstar_six[, 2]
+
+  V(nhs_net_igraph)$color <- node_data_aux_rstar_six[, 3]
+
+  V(nhs_net_igraph)$label.color <- rep("white", 140)
+  
+   plot(nhs_net_igraph)
+
+```
+
+```{r, fig.width=12,fig.height=2.5, echo = FALSE}
+   barplot(rep(1, 140), col = node_hierarchy_NHS_network_rstar_six[, 3], names.arg = round(seq(0, 1, 1/139), 2), axes = FALSE, main = "Node relevance for NHS Trusts network for r* = 6")
 ```
