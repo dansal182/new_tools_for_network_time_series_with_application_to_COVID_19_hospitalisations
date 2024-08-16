@@ -543,7 +543,7 @@ We perform one-ahead forecasting ten times and save the squared error.
 ```
 
 
-### 3.3.1 Comparison with VAR at highest growing peak (i.e., second-wave peak)
+### 3.2.1 Comparison with VAR at highest growing peak (i.e., second-wave peak)
 
 For completeness, we also compare the models at the peak of the second wave.
 
@@ -681,6 +681,196 @@ We perform one-ahead forecasting ten times and save the squared error.
   knitr::kable(all_summary, "simple")
 ```
 
+### 3.2.2 Three-step ahead squared prediction error comparison
+
+We compare three-step ahead squared prediction error at the end of the realisation, and at the start of the second wave. The results for the end of the realisation follow in the table below.
+
+```{r}
+  covid_data = logMVbedMVC.vts
+  t_steps = 3
+  initial_start = 452 - t_steps
+  decimal_digits = 3
+  train_end = initial_start
+  test_point = train_end + 1
+
+  output <- matrix(rep(0, 18), nrow = 6, ncol = 3)
+  # We compare the GNAR models in this script
+  
+  # 140 AR(1) models
+  arforecast <- apply(covid_data[1:train_end, ], 2, function(x){
+    forecast(auto.arima(x, d = 0, D = 0, max.p = 1, max.q = 0,
+                        max.P = 0, max.Q = 0, stationary = TRUE, seasonal = FALSE, ic = 'bic',
+                        allowmean = FALSE, allowdrift = FALSE, trace = FALSE), h = 3)$mean 
+  })
+  one_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point, ])^2), decimal_digits)
+  two_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point + 1, ])^2), decimal_digits)
+  three_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point + 2, ])^2), decimal_digits)
+  ar_spde_three_steps = c(one_step_ahead_ar, two_step_ahead_ar, three_step_ahead_ar)
+  
+  # GNAR(1, [1]) global-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1))
+  three_step_ahead_predictions = predict(covid_fit, 3)
+  one_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[1, ] - covid_data[test_point, ])^2), digits = decimal_digits)
+  two_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[2, ] - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  three_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[3, ] - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  gnar_global_spde_three_steps = c(one_step_ahead_gnar_global, two_step_ahead_gnar_global, three_step_ahead_gnar_global)
+
+  
+  # GNAR(1, [1]) local-alpha fit
+  covid_fit_local <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1), globalalpha=FALSE)
+  three_step_ahead_predictions = predict(covid_fit_local, 3)
+  one_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[1, ] - covid_data[test_point, ])^2), digits = decimal_digits)
+  two_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[2, ] - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  three_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[3, ] - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  gnar_local_spde_three_steps = c(one_step_ahead_gnar_local, two_step_ahead_gnar_local, three_step_ahead_gnar_local)
+  
+  
+  # Restricted VAR(1) model
+  res_varforecast <- predict(restrict(VAR(covid_data[1:train_end, ], p = 1, type = 'none')), n.ahead = 3)
+  # Vectorise model output and predictions
+  res_var_one_step_ahead <- function(x){return (x[1])}
+  res_var_two_step_ahead <- function(x){return (x[2])}
+  res_var_three_step_ahead <- function(x){return (x[3])}
+  res_var_point_one_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_one_step_ahead))
+  res_var_point_two_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_two_step_ahead))
+  res_var_point_three_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_three_step_ahead))
+  #Compute mean squared prediction error
+  res_var_mspe_one_step = round(sum((res_var_point_one_step_ahead - covid_data[test_point, ])^2), digits = decimal_digits)
+  res_var_mspe_two_step = round(sum((res_var_point_two_step_ahead - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  res_var_mspe_three_step = round(sum((res_var_point_three_step_ahead - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  res_var_spde_three_steps = c(res_var_mspe_one_step, res_var_mspe_two_step, res_var_mspe_three_step)
+  
+  
+  # Classic VAR(1) model
+  varforecast <- predict(VAR(covid_data[1:train_end, ], p = 1, type = 'none'), n.ahead = 3)
+  # Vectorise model output and predictions
+  var_one_step_ahead <- function(x){return (x[1])}
+  var_two_step_ahead <- function(x){return (x[2])}
+  var_three_step_ahead <- function(x){return (x[3])}
+  var_point_one_step_ahead <- unlist(lapply(varforecast$fcst, var_one_step_ahead))
+  var_point_two_step_ahead <- unlist(lapply(varforecast$fcst, var_two_step_ahead))
+  var_point_three_step_ahead <- unlist(lapply(varforecast$fcst, var_three_step_ahead))
+  #Compute mean squared prediction error
+  var_mspe_one_step = round(sum((var_point_one_step_ahead - covid_data[test_point, ])^2), digits = decimal_digits)
+  var_mspe_two_step = round(sum((var_point_two_step_ahead - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  var_mspe_three_step = round(sum((var_point_three_step_ahead - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  var_spde_three_steps = c(var_mspe_one_step, var_mspe_two_step, var_mspe_three_step)
+  
+  
+  
+  # Sparse VAR(1) model
+  sparse_var_forecast <- fitVAR(covid_data[1:train_end, ], p = 1)
+  one_step_ahead_svar = sparse_var_forecast$A[[1]] %*% covid_data[train_end, ]
+  two_step_ahead_svar = sparse_var_forecast$A[[1]] %*% one_step_ahead_svar
+  three_step_ahead_svar = sparse_var_forecast$A[[1]] %*% two_step_ahead_svar
+  svar_mspe_one_step = round(sum((one_step_ahead_svar - covid_data[test_point, ])^2), digits = decimal_digits)
+  svar_mspe_two_step = round(sum((two_step_ahead_svar - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  svar_mspe_three_step = round(sum((three_step_ahead_svar - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  svar_spde_three_steps = c(svar_mspe_one_step, svar_mspe_two_step, svar_mspe_three_step)
+  ##########################
+  
+spde_table = data.frame("St. Ahead" = c("one", "two", "three"), "AR(1)" = ar_spde_three_steps, "GNAR(1, [1])" = gnar_global_spde_three_steps, "GNAR(1, [1])*" = gnar_local_spde_three_steps,
+                        "Res. VAR(1)" = res_var_spde_three_steps, "VAR(1)" = var_spde_three_steps, "Sp. VAR(1)" = svar_spde_three_steps,
+                          check.names = FALSE)
+
+knitr::kable(spde_table, 'simple')
+
+```
+
+The comparison at the start of the second wave, i.e., $T = 300$ is given below. 
+
+```{r, echo=FALSE}
+  t_steps = 3
+  initial_start = 300 - t_steps
+  decimal_digits = 3
+  train_end = initial_start
+  test_point = train_end + 1
+
+  output <- matrix(rep(0, 18), nrow = 6, ncol = 3)
+  # We compare the GNAR models in this script
+  
+  # 140 AR(1) models
+  arforecast <- apply(covid_data[1:train_end, ], 2, function(x){
+    forecast(auto.arima(x, d = 0, D = 0, max.p = 1, max.q = 0,
+                        max.P = 0, max.Q = 0, stationary = TRUE, seasonal = FALSE, ic = 'bic',
+                        allowmean = FALSE, allowdrift = FALSE, trace = FALSE), h = 3)$mean 
+  })
+  one_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point, ])^2), decimal_digits)
+  two_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point + 1, ])^2), decimal_digits)
+  three_step_ahead_ar = round(sum((arforecast[1, ] - covid_data[test_point + 2, ])^2), decimal_digits)
+  ar_spde_three_steps = c(one_step_ahead_ar, two_step_ahead_ar, three_step_ahead_ar)
+  
+  # GNAR(1, [1]) global-alpha fit
+  covid_fit <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1))
+  three_step_ahead_predictions = predict(covid_fit, 3)
+  one_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[1, ] - covid_data[test_point, ])^2), digits = decimal_digits)
+  two_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[2, ] - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  three_step_ahead_gnar_global = round(sum((three_step_ahead_predictions[3, ] - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  gnar_global_spde_three_steps = c(one_step_ahead_gnar_global, two_step_ahead_gnar_global, three_step_ahead_gnar_global)
+
+  
+  # GNAR(1, [1]) local-alpha fit
+  covid_fit_local <- GNARfit(covid_data[1:train_end, ], net = NHSTrustMVCAug120.net, alphaOrder = 1, betaOrder = rep(1, 1), globalalpha=FALSE)
+  three_step_ahead_predictions = predict(covid_fit_local, 3)
+  one_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[1, ] - covid_data[test_point, ])^2), digits = decimal_digits)
+  two_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[2, ] - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  three_step_ahead_gnar_local = round(sum((three_step_ahead_predictions[3, ] - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  gnar_local_spde_three_steps = c(one_step_ahead_gnar_local, two_step_ahead_gnar_local, three_step_ahead_gnar_local)
+  
+  
+  # Restricted VAR(1) model
+  res_varforecast <- predict(restrict(VAR(covid_data[1:train_end, ], p = 1, type = 'none')), n.ahead = 3)
+  # Vectorise model output and predictions
+  res_var_one_step_ahead <- function(x){return (x[1])}
+  res_var_two_step_ahead <- function(x){return (x[2])}
+  res_var_three_step_ahead <- function(x){return (x[3])}
+  res_var_point_one_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_one_step_ahead))
+  res_var_point_two_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_two_step_ahead))
+  res_var_point_three_step_ahead <- unlist(lapply(res_varforecast$fcst, res_var_three_step_ahead))
+  #Compute mean squared prediction error
+  res_var_mspe_one_step = round(sum((res_var_point_one_step_ahead - covid_data[test_point, ])^2), digits = decimal_digits)
+  res_var_mspe_two_step = round(sum((res_var_point_two_step_ahead - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  res_var_mspe_three_step = round(sum((res_var_point_three_step_ahead - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  res_var_spde_three_steps = c(res_var_mspe_one_step, res_var_mspe_two_step, res_var_mspe_three_step)
+  
+  
+  # Classic VAR(1) model
+  varforecast <- predict(VAR(covid_data[1:train_end, ], p = 1, type = 'none'), n.ahead = 3)
+  # Vectorise model output and predictions
+  var_one_step_ahead <- function(x){return (x[1])}
+  var_two_step_ahead <- function(x){return (x[2])}
+  var_three_step_ahead <- function(x){return (x[3])}
+  var_point_one_step_ahead <- unlist(lapply(varforecast$fcst, var_one_step_ahead))
+  var_point_two_step_ahead <- unlist(lapply(varforecast$fcst, var_two_step_ahead))
+  var_point_three_step_ahead <- unlist(lapply(varforecast$fcst, var_three_step_ahead))
+  #Compute mean squared prediction error
+  var_mspe_one_step = round(sum((var_point_one_step_ahead - covid_data[test_point, ])^2), digits = decimal_digits)
+  var_mspe_two_step = round(sum((var_point_two_step_ahead - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  var_mspe_three_step = round(sum((var_point_three_step_ahead - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  var_spde_three_steps = c(var_mspe_one_step, var_mspe_two_step, var_mspe_three_step)
+  
+  
+  
+  # Sparse VAR(1) model
+  sparse_var_forecast <- fitVAR(covid_data[1:train_end, ], p = 1)
+  one_step_ahead_svar = sparse_var_forecast$A[[1]] %*% covid_data[train_end, ]
+  two_step_ahead_svar = sparse_var_forecast$A[[1]] %*% one_step_ahead_svar
+  three_step_ahead_svar = sparse_var_forecast$A[[1]] %*% two_step_ahead_svar
+  svar_mspe_one_step = round(sum((one_step_ahead_svar - covid_data[test_point, ])^2), digits = decimal_digits)
+  svar_mspe_two_step = round(sum((two_step_ahead_svar - covid_data[test_point + 1, ])^2), digits = decimal_digits)
+  svar_mspe_three_step = round(sum((three_step_ahead_svar - covid_data[test_point + 2, ])^2), digits = decimal_digits)
+  svar_spde_three_steps = c(svar_mspe_one_step, svar_mspe_two_step, svar_mspe_three_step)
+  ##########################
+  
+spde_table = data.frame("St. Ahead" = c("one", "two", "three"), "AR(1)" = ar_spde_three_steps, "GNAR(1, [1])" = gnar_global_spde_three_steps, "GNAR(1, [1])*" = gnar_local_spde_three_steps,
+                        "Res. VAR(1)" = res_var_spde_three_steps, "VAR(1)" = var_spde_three_steps, "Sp. VAR(1)" = svar_spde_three_steps,
+                          check.names = FALSE)
+
+knitr::kable(spde_table, 'simple')
+
+```
+
+
 ## 3.3 Comparison with CAR model
 
 For completeness we also compare GNAR with a conditional autoregressive temporal autoregressive (CARar) model. Mean squared prediction error (MSPE) comparisons, including standard deviation (sd. MSPE) follow in the Table below. Interestingly, both models perform similarly. It turns out that CARar models can be seen as GNAR models constrained to one-stage neighbourhood regressions. Computation for CARar requires expensive MCMC calls, thus, for brevity we summarise the results below; see https://github.com/dansal182/new_tools_for_network_time_series_with_application_to_COVID_19_hospitalisations for the experiments code.
@@ -717,6 +907,9 @@ knitr::kable(computation_time_table, "simple")
 
 Execution time comparison between global-$\alpha$ GNAR models and CARar models. The total execution time is the time computing one-step ahead forecasts ten times (i.e., the forecasts used for producing MSPE Table) takes in seconds. The average time is the total time divided by ten.
 
+### 3.3.1 Three-step ahead squared prediction error
+
+We remark that $n$-step ahead forecasting is computationally cumbersome with CAR models. Unfortunately, the $\texttt{CARBayesST}$ package does not provide a forecasting method. However, these forecasts can be computed by treating the estimated model as a VAR process, which resembles GNAR$(1, [1])$ models; see the supplementary material for details.
 
 ## 3.4 Analysing node impact on network autocorrelation
 
@@ -803,9 +996,10 @@ library(GNAR)
    barplot(rep(1, 140), col = node_hierarchy_NHS_network[, 3], names.arg = round(seq(0, 1, 1/139), 2), axes = FALSE, main = "Node relevance for NHS Trusts network")
 ```
 
-For comparison purposes, and highlighting that node relevance depends on the network time series dynamics. We also plot the node relevance for $r^* = 3$ (i.e., largest shortets path equal to three), and $r^* = 6$ (i.e., largest shortets path equal to six). 
 
 ### 3.4.1 Node relevance for r-stage depth equal to three
+
+For comparison purposes, and highlighting that node relevance depends on the network time series dynamics. We also plot the node relevance for $r^* = 3$ (i.e., largest shortest path equal to three), and $r^* = 6$ (i.e., largest shortest path equal to six).
 
 ```{r, fig.width=12,fig.height=10, echo=FALSE}
   load("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/node_relevance_plot_data_rstar_three.RData")
