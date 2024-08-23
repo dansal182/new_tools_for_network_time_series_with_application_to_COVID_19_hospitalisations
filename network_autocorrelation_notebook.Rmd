@@ -26,7 +26,7 @@ $$
     \boldsymbol{X}_{t} = \sum_{k = 1}^{p} \left (\alpha_{k} \boldsymbol{X}_{t - k} + \sum_{r = 1}^{s_k} \beta_{kr} \boldsymbol{Z}_{r, t - k} \right ) + \boldsymbol{u}_{t} ,
 \end{equation}
 $$
-We use the $\texttt{fiveNet}$ (included in the CRAN $\texttt{GNAR}$ package) network throughout this notebook for producing all relevant figures.
+We use the $\mathbf{fiveNet}$, included in the CRAN $\texttt{GNAR}$ package, network throughout this notebook for producing all relevant figures.
 
 ## 2.1 Producing GNAR simulations
 
@@ -35,7 +35,7 @@ We begin by loading the GNAR package into our session in $\texttt{R}$.
   library(GNAR)
   source("/Users/danielsalnikov/Documents/PhD/my_stuff/papers/corbit_paper/R_scripts/R_scripts_revised/R-Corbit_Covid.R")
 ```
-We simulate a realisation of length one-hundred by using the function $\texttt{GNARsim}$. The code for producing the first simulation also shows how to compute the $r$-stage adjacency matrices and the weights matrix for the $\texttt{fiveNet}$ network.
+We simulate a realisation of length one-hundred by using the function $\texttt{GNARsim}$. The code for producing the first simulation also shows how to compute the $r$-stage adjacency matrices and the weights matrix for the $\mathbf{fiveNet}$ network.
 
 ```{r}
   n_sims = 100
@@ -125,7 +125,70 @@ We examine a basic GNAR model
   corbit_plot(vts = sim2, net = fiveNet, max_lag = m_lag, max_stage = 3, viridis_color_option = 'viridis', partial = "yes")
 ```
 
-## 2.3 Producing R-Corbit plots
+## 2.3 Producing alternative Corbit plots
+
+Corbit plots can be produced in alternative ways that naturally handle missing values. We present these alternatives in this subsection. 
+
+```{r, echo=FALSE}
+  library(glasso)
+  source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/corrbit.R")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/nacf_r.R")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/nacf_dummy_models.R")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/weight_adjustment_methods.R")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/nacf_pnacf_edited.r")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/corbit_plot_edit.r")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/communal_gnar/global_gnar_fitting.R")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/plot_corbit_line_segment.r")
+source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/rectangular_corbit_plot.r")
+
+gdp_data <- apply(gdpVTS, 2, function(x){x / sd(x[1:50], na.rm = TRUE)})
+aux = gdp_data
+aux[is.na(aux)] = 0
+
+
+# covariance matrix (i.e., autocovariance matrix at lag zero)
+S = cor(aux)
+# graphical lasso for learning a network
+a = glasso(S, rho=0.15, nobs=50)
+b = a$wi
+b[abs(b) > 0.0] = 1
+diag(b) = 0
+
+
+# create the network object
+net_result = graph_from_adjacency_matrix(b, 'undirected')
+stages_list = get_k_stages_adjacency_tensor(as.matrix(net_result), 3)
+
+
+# compute the weights matrix
+W = distances(net_result)
+W0 = normalise_weights(stages_list, max(W), W)
+
+# max lag and max stage for the corbit plots
+max_lag_nacf = 10
+max_stage_nacf = max(W)
+```
+
+We start with a Corbit plot that includes a line segment between the first and last lags. It is also possible to print $\mathrm{(p)nacf}$ values by either printing the call or by assigning an object to it ($\texttt{corbit_plot_edt}$ returns an invisble matrix containing these values). This is done by changing the option $\texttt{line_segment = "yes"}$ in a $\texttt{corbit_plot_edt}$ call. The data used for producing the Corbit plots below is the $\mathbf{gdpVTS}$ (i.e., GDP vector time series) included in the $\texttt{GNAR}$ package.
+
+
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, line_segment = "yes"))
+```
+
+We can produce a rectangular Corbit plot by setting $\texttt{rectangular_plot = "yes"}$. 
+
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="yes"))
+```
+
+Finally, setting $\texttt{rectangular_plot = "square"}$ produces a square Corbit plot.
+
+```{r, fig.width=14,fig.height=10, echo=TRUE}
+  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="square"))
+```
+
+## 2.4 Producing R-Corbit plots
 
 R-Corbit plots allow quick comparison of network correlation structures for different time-slices and/or covariates (e.g., labels). We produce an example comparing three distinct GNAR simulations below.
 
