@@ -131,15 +131,7 @@ Corbit plots can be produced in alternative ways that naturally handle missing v
 
 ```{r, echo=FALSE}
   library(glasso)
-  source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/corrbit.R")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/nacf_r.R")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/nacf_dummy_models.R")
 source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/weight_adjustment_methods.R")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/nacf_pnacf_edited.r")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/corbit_plot_edit.r")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/communal_gnar/global_gnar_fitting.R")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/vs_code_editing/plot_corbit_line_segment.r")
-source("/Users/danielsalnikov/Documents/PhD/code_scripts/network_autocorrelation/corbit_scripts/rectangular_corbit_plot.r")
 
 gdp_data <- apply(gdpVTS, 2, function(x){x / sd(x[1:50], na.rm = TRUE)})
 aux = gdp_data
@@ -173,19 +165,19 @@ We start with a Corbit plot that includes a line segment between the first and l
 
 
 ```{r, fig.width=14,fig.height=10, echo=TRUE}
-  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, line_segment = "yes"))
+  print(corbit_plot(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, line_segment = "yes"))
 ```
 
 We can produce a rectangular Corbit plot by setting $\texttt{rectangular_plot = "yes"}$. 
 
 ```{r, fig.width=14,fig.height=10, echo=TRUE}
-  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="yes"))
+  print(corbit_plot(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="yes"))
 ```
 
 Finally, setting $\texttt{rectangular_plot = "square"}$ produces a square Corbit plot.
 
 ```{r, fig.width=14,fig.height=10, echo=TRUE}
-  print(corbit_plot_edt(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="square"))
+  print(corbit_plot(vts = gdpVTS, net = igraphtoGNAR(net_result), max_lag = 10, max_stage = max_stage_nacf, weight_matrix = W0, rectangular_plot="square"))
 ```
 
 ## 2.4 Producing R-Corbit plots
@@ -211,9 +203,9 @@ sim3 <-  GNARsim(n = n_sims, net=fiveNet, alphaParams = list(rep(0.12, 5), rep(0
                  betaParams = list(c(0.25, 0.27), c(0.18)))
 
 # Produce R-Corbot plots
-R_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes")
+r_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes")
 
-R_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes", partial = "yes")
+r_corbit_plot(list(sim1, sim2, sim3), list(fiveNet), m_lag, m_stage, frame_names = c("GNAR(1, [2, 2]) simulation.", "GNAR(1, [1]) simulation.", "GNAR(1, [2]) simulation."), same_net = "yes", partial = "yes")
 ```
 
 
@@ -988,14 +980,14 @@ We start by defining the different waves of the pandemic and looking at a R-Corb
   gap = covid_data[101:177, ]
   second_wave = covid_data[178:447, ]
   time_slices = c('First Wave: 04-2020 -> 07-2020', 'Gap: 07-2020 -> 09-2020', 'Second Wave: 09-2020 -> 07-2021')
-  R_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
+  r_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
             frame_names = time_slices)
 ```
 
 The PNACF R-Corbit plot is produced with the code below.
 
 ```{r, fig.width=14,fig.height=10, echo=TRUE}
-  R_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
+  r_corbit_plot(list(first_wave, gap, second_wave), list(NHSTrustMVCAug120.net), 10, 6, weight_matrices = list(W_nhs_network), same_net = 'yes', 
             frame_names = time_slices, partial = 'yes')
 ```
 
